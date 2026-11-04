@@ -1,0 +1,15 @@
+[Unit]
+Description=Onward Logistics order system
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=onward
+WorkingDirectory=/opt/onward/src
+EnvironmentFile=/etc/onward/orders.env
+# One worker keeps the mock order list consistent per server; threads handle concurrency.
+ExecStart=/opt/onward/venv/bin/gunicorn --bind 0.0.0.0:8080 --workers 1 --threads 8 app:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

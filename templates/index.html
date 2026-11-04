@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Onward Logistics · Orders</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f4f6f8; color: #1b2228; }
+    header { background: #1f3864; color: #fff; padding: 1rem 1.5rem; }
+    header h1 { margin: 0; font-size: 1.3rem; }
+    header p { margin: .25rem 0 0; opacity: .85; }
+    main { max-width: 56rem; margin: 1.5rem auto; padding: 0 1rem; display: grid; gap: 1rem; }
+    section { background: #fff; border: 1px solid #d5dbe1; border-radius: 6px; padding: 1rem 1.25rem; }
+    h2 { margin: 0 0 .75rem; font-size: 1.05rem; }
+    .server { border-left: 5px solid #0f7a6c; }
+    .server dl { display: grid; grid-template-columns: max-content 1fr; gap: .3rem 1rem; margin: 0; }
+    dt { color: #5d6973; } dd { margin: 0; font-family: ui-monospace, monospace; }
+    form { display: flex; flex-wrap: wrap; gap: .5rem; }
+    input { padding: .45rem; border: 1px solid #b8c1ca; border-radius: 4px; flex: 1 1 10rem; }
+    button { padding: .45rem 1rem; border: 0; border-radius: 4px; background: #1f3864; color: #fff; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid #e3e7eb; }
+    .error { color: #b00020; margin: .5rem 0 0; }
+    .note { color: #5d6973; font-size: .85rem; margin: .5rem 0 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{{ lab }}</h1>
+    <p>Built by {{ owner }}</p>
+  </header>
+  <main>
+    <section class="server">
+      <h2>This page was served by</h2>
+      <dl>
+        <dt>Instance</dt><dd>{{ server.instance_id }}</dd>
+        <dt>Availability Zone</dt><dd>{{ server.availability_zone }}</dd>
+        <dt>Private IP</dt><dd>{{ server.private_ip }}</dd>
+      </dl>
+      <p class="note">Refresh the page: the load balancer may send you to a different server.</p>
+    </section>
+
+    <section>
+      <h2>Place a delivery order</h2>
+      <form method="post" action="/orders">
+        <input name="merchant" placeholder="Merchant" required maxlength="60">
+        <input name="destination" placeholder="Destination" required maxlength="60">
+        <input name="weight_kg" type="number" step="0.1" min="0.1" max="100" placeholder="Weight (kg)" required>
+        <button type="submit">Place order</button>
+      </form>
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    </section>
+
+    <section>
+      <h2>Recent orders on this server</h2>
+      <table>
+        <thead><tr><th>Order</th><th>Merchant</th><th>Destination</th><th>Weight</th><th>Price</th><th>Time</th></tr></thead>
+        <tbody>
+        {% for o in orders %}
+          <tr><td>{{ o.id }}</td><td>{{ o.merchant }}</td><td>{{ o.destination }}</td>
+              <td>{{ o.weight_kg }} kg</td><td>${{ "%.2f"|format(o.price) }}</td><td>{{ o.created }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <p class="note">Orders are mocked in memory on each server for this lab, so each server lists only the orders it took.</p>
+    </section>
+  </main>
+</body>
+</html>

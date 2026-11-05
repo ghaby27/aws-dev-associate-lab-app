@@ -1,0 +1,34 @@
+{
+  "family": "onward-dev-delivery-orders",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "runtimePlatform": { "operatingSystemFamily": "LINUX", "cpuArchitecture": "X86_64" },
+  "executionRoleArn": "arn:aws:iam::448049788660:role/onward-dev-delivery-task-execution",
+  "containerDefinitions": [
+    {
+      "name": "orders",
+      "image": "<IMAGE1_NAME>",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8080, "protocol": "tcp" }],
+      "environment": [
+        { "name": "OWNER_NAME", "value": "Gabriel Anyaele" },
+        { "name": "LAB_NAME", "value": "Delivering Order System Updates Safely for Onward Logistics" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/onward/dev/delivery/orders",
+          "awslogs-region": "eu-west-1",
+          "awslogs-stream-prefix": "orders"
+        }
+      }
+    }
+  ],
+  "tags": [
+    { "key": "Project", "value": "onward" },
+    { "key": "Owner", "value": "Gabriel Anyaele" },
+    { "key": "Environment", "value": "dev" }
+  ]
+}

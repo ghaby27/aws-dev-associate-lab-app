@@ -1,0 +1,11 @@
+# CodeDeploy (ECS blue/green): which container and port the load balancer sends traffic to.
+# CodePipeline replaces <TASK_DEFINITION> with the task definition it registers from taskdef.json.
+version: 0.0
+Resources:
+  - TargetService:
+      Type: AWS::ECS::Service
+      Properties:
+        TaskDefinition: <TASK_DEFINITION>
+        LoadBalancerInfo:
+          ContainerName: orders
+          ContainerPort: 8080

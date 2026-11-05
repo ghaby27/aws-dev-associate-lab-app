@@ -1,8 +1,10 @@
 """Onward Logistics order system: one deployable that serves the UI and the order logic.
 
 Orders are mocked in memory on each server (the lab does not ask for a database), so
-each server shows only the orders it took. The page always shows which server answered.
+each server shows only the orders it took. The page always shows which server answered:
+an ECS task when it runs in a container on Fargate, an EC2 instance otherwise.
 """
+import json
 import os
 import socket
 import urllib.request
@@ -15,8 +17,27 @@ app = Flask(__name__)
 
 OWNER_NAME = os.environ.get("OWNER_NAME", "Gabriel Anyaele")
 LAB_NAME = os.environ.get("LAB_NAME", "Handling Sales Day Demand for the Onward Logistics Order System")
+APP_VERSION = os.environ.get("APP_VERSION", "dev")  # set to the commit SHA when the image is built
 
 IMDS = "http://169.254.169.254/latest"
+ECS_METADATA = os.environ.get("ECS_CONTAINER_METADATA_URI_V4")  # set by ECS in every container
+
+
+def _ecs_server():
+    """Read the ECS task metadata endpoint. Returns None when not running on ECS."""
+    if not ECS_METADATA:
+        return None
+    try:
+        task = json.load(urllib.request.urlopen(f"{ECS_METADATA}/task", timeout=1))
+        container = json.load(urllib.request.urlopen(ECS_METADATA, timeout=1))
+        return {
+            "kind": "ECS task",
+            "instance_id": task["TaskARN"].rsplit("/", 1)[-1],
+            "availability_zone": task.get("AvailabilityZone", "unknown"),
+            "private_ip": container["Networks"][0]["IPv4Addresses"][0],
+        }
+    except (OSError, KeyError, IndexError, ValueError):
+        return None
 
 
 def _metadata(path):
@@ -34,11 +55,13 @@ def _metadata(path):
 
 
 # Looked up once at start-up: a server's identity never changes while it runs.
-SERVER = {
+SERVER = _ecs_server() or {
+    "kind": "EC2 instance",
     "instance_id": _metadata("instance-id") or socket.gethostname(),
     "availability_zone": _metadata("placement/availability-zone") or "local",
     "private_ip": _metadata("local-ipv4") or "127.0.0.1",
 }
+SERVER["version"] = APP_VERSION
 
 _ids = count(1001)
 ORDERS = []

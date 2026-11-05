@@ -33,9 +33,10 @@
     <section class="server">
       <h2>This page was served by</h2>
       <dl>
-        <dt>Instance</dt><dd>{{ server.instance_id }}</dd>
+        <dt>{{ server.kind }}</dt><dd>{{ server.instance_id }}</dd>
         <dt>Availability Zone</dt><dd>{{ server.availability_zone }}</dd>
         <dt>Private IP</dt><dd>{{ server.private_ip }}</dd>
+        <dt>Version</dt><dd>{{ server.version }}</dd>
       </dl>
       <p class="note">Refresh the page: the load balancer may send you to a different server.</p>
     </section>

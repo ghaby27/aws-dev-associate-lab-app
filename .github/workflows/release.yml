@@ -1,0 +1,51 @@
+# Builds the order app image on every merge to main and pushes it to Amazon ECR.
+# Signs in to AWS with GitHub's OIDC token (no stored access keys): the role only allows
+# pushing to this one repository. The push of the :latest tag is the release trigger:
+# EventBridge sees it and starts CodePipeline, which deploys it blue/green with CodeDeploy.
+name: release
+
+on:
+  push:
+    branches: [main]
+    paths: [app.py, templates/**, requirements.txt, Dockerfile, deploy/**]
+    tags: ["build-*"]   # pushed by the infra repo's deploy hook to build the first image after a rebuild
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # request the OIDC token
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-west-1
+  AWS_ROLE_ARN: arn:aws:iam::448049788660:role/onward-dev-delivery-github-push
+  ECR_REPOSITORY: onward-dev-delivery-orders
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sign in to AWS with OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sign in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push the image
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+        run: |
+          version=${GITHUB_SHA::7}
+          docker build --build-arg APP_VERSION="$version" -t "$IMAGE:$version" -t "$IMAGE:latest" .
+          docker push "$IMAGE:$version"
+          docker push "$IMAGE:latest"
+          echo "Pushed $IMAGE:$version (also :latest, which starts the release)" >> "$GITHUB_STEP_SUMMARY"

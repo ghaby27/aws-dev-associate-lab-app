@@ -5,8 +5,12 @@ each server shows only the orders it took. The page always shows which server an
 an ECS task when it runs in a container on Fargate, an EC2 instance otherwise.
 """
 import json
+import math
 import os
 import socket
+import subprocess
+import sys
+import time
 import urllib.request
 from datetime import datetime, timezone
 from itertools import count
@@ -18,6 +22,7 @@ app = Flask(__name__)
 OWNER_NAME = os.environ.get("OWNER_NAME", "Gabriel Anyaele")
 LAB_NAME = os.environ.get("LAB_NAME", "Handling Sales Day Demand for the Onward Logistics Order System")
 APP_VERSION = os.environ.get("APP_VERSION", "dev")  # set to the commit SHA when the image is built
+SPIKE_MINUTES = int(os.environ.get("SPIKE_MINUTES", "8"))
 
 IMDS = "http://169.254.169.254/latest"
 ECS_METADATA = os.environ.get("ECS_CONTAINER_METADATA_URI_V4")  # set by ECS in every container
@@ -88,10 +93,70 @@ create_order("Kente Crafts", "Accra, Osu", 1.2)
 create_order("Lagos Gadgets", "Lagos, Yaba", 3.5)
 
 
+# ---------------------------------------------------------------------------
+# Sales-day spike: a button on the page keeps this server's CPU busy for a few
+# minutes, so auto scaling has something to react to. The burners use 80% of the
+# server's CPU allocation (well above the 50% scaling target) at the lowest
+# priority, so the app keeps answering pages and health checks during the spike.
+# ---------------------------------------------------------------------------
+SPIKE_SHARE = 0.8
+_BURN = """
+import os, sys, time
+os.nice(19)
+end, duty = time.time() + float(sys.argv[1]), float(sys.argv[2])
+while time.time() < end:          # busy for duty x 10 ms, idle for the rest
+    stop = time.perf_counter() + duty * 0.01
+    while time.perf_counter() < stop:
+        pass
+    time.sleep((1 - duty) * 0.01)
+"""
+_spike = {"until": 0.0, "burners": []}
+
+
+def _cpu_allocation():
+    """CPUs this server may use: the Fargate task size, a container CPU limit, or all CPUs."""
+    if ECS_METADATA:
+        try:
+            cpu = json.load(urllib.request.urlopen(f"{ECS_METADATA}/task", timeout=1))["Limits"]["CPU"]
+            if cpu:
+                return float(cpu)
+        except (OSError, KeyError, ValueError, TypeError):
+            pass
+    try:
+        quota, period = open("/sys/fs/cgroup/cpu.max").read().split()
+        if quota != "max":
+            return int(quota) / int(period)
+    except (OSError, ValueError):
+        pass
+    return float(len(os.sched_getaffinity(0)))
+
+
+def spike_until():
+    """When the running spike ends (UTC "HH:MM:SS"), or None."""
+    _spike["burners"] = [p for p in _spike["burners"] if p.poll() is None]  # reap finished ones
+    if _spike["until"] <= time.time():
+        return None
+    return datetime.fromtimestamp(_spike["until"], timezone.utc).strftime("%H:%M:%S UTC")
+
+
+@app.post("/spike")
+def start_spike():
+    if not spike_until():  # one spike at a time per server
+        seconds = SPIKE_MINUTES * 60
+        total = SPIKE_SHARE * _cpu_allocation()
+        burners = max(1, math.ceil(total))
+        for _ in range(burners):
+            _spike["burners"].append(subprocess.Popen(
+                [sys.executable, "-c", _BURN, str(seconds), str(total / burners)]))
+        _spike["until"] = time.time() + seconds
+    return redirect(url_for("index"))
+
+
 @app.get("/")
 def index():
-    return render_template("index.html", owner=OWNER_NAME, lab=LAB_NAME,
-                           server=SERVER, orders=ORDERS, error=request.args.get("error"))
+    return render_template("index.html", owner=OWNER_NAME, lab=LAB_NAME, server=SERVER,
+                           orders=ORDERS, error=request.args.get("error"),
+                           spike_until=spike_until(), spike_minutes=SPIKE_MINUTES)
 
 
 @app.post("/orders")
@@ -111,7 +176,7 @@ def place_order():
 @app.get("/api/whoami")
 def whoami():
     """Small JSON answer for a curl loop that shows load balancing."""
-    return jsonify(SERVER)
+    return jsonify(SERVER | {"spike_until": spike_until()})
 
 
 @app.get("/health")

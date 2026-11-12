@@ -22,6 +22,9 @@
     th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid #e3e7eb; }
     .error { color: #b00020; margin: .5rem 0 0; }
     .note { color: #5d6973; font-size: .85rem; margin: .5rem 0 0; }
+    .spike { border-left: 5px solid #b45309; }
+    .spike button { background: #b45309; }
+    .busy { color: #b45309; font-weight: 600; margin: 0; }
   </style>
 </head>
 <body>
@@ -39,6 +42,19 @@
         <dt>Version</dt><dd>{{ server.version }}</dd>
       </dl>
       <p class="note">Refresh the page: the load balancer may send you to a different server.</p>
+    </section>
+
+    <section class="spike">
+      <h2>Sales-day CPU spike</h2>
+      {% if spike_until %}
+        <p class="busy">CPU spike running on this server until {{ spike_until }}.</p>
+        <p class="note">Watch the service add servers as average CPU passes the scaling target, then remove them once the spike ends.</p>
+      {% else %}
+        <form method="post" action="/spike">
+          <button type="submit">Start a {{ spike_minutes }}-minute CPU spike on this server</button>
+        </form>
+        <p class="note">Keeps this server's CPU busy so auto scaling adds capacity. Orders are still served: the spike runs at the lowest priority.</p>
+      {% endif %}
     </section>
 
     <section>

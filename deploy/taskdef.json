@@ -14,7 +14,7 @@
       "portMappings": [{ "containerPort": 8080, "protocol": "tcp" }],
       "environment": [
         { "name": "OWNER_NAME", "value": "Gabriel Anyaele" },
-        { "name": "LAB_NAME", "value": "Delivering Order System Updates Safely for Onward Logistics" }
+        { "name": "LAB_NAME", "value": "Delivering Order System Updates Safely for Onward Logistics v2" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",

@@ -94,6 +94,19 @@ create_order("Lagos Gadgets", "Lagos, Yaba", 3.5)
 
 
 # ---------------------------------------------------------------------------
+# Simulated bad release, for showing the automatic rollback. Uncomment, push to
+# main, and keep scripts/watch.sh running: health checks still pass, so CodeDeploy
+# moves traffic to this version; every page then returns 500, the 5xx alarm fires
+# (more than 5 errors in a minute) and CodeDeploy moves traffic back to the old
+# version on its own. Comment it out again and push, so main matches what runs.
+# ---------------------------------------------------------------------------
+# @app.before_request
+# def simulated_bad_release():
+#     if request.path != "/health":
+#         return "Simulated bad release", 500
+
+
+# ---------------------------------------------------------------------------
 # Sales-day spike: a button on the page keeps this server's CPU busy for a few
 # minutes, so auto scaling has something to react to. The burners use 80% of the
 # server's CPU allocation (well above the 50% scaling target) at the lowest
